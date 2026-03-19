@@ -3,29 +3,29 @@ from .models import User
 from werkzeug.security import generate_password_hash, check_password_hash
 from . import db
 from flask_login import login_user, login_required, logout_user, current_user
+from sqlalchemy import select
 
-
-auth = Blueprint('auth',__name__)
-
+auth = Blueprint('auth', __name__)
 
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        
-        user = User.query.filter_by(email=email).first()
+
+        user = db.session.scalar(select(User).filter_by(email=email))
+
         if user:
             if check_password_hash(user.password, password):
-                flash('logged in successfully!', category='success')
+                flash('Logged in successfully!', category='success')
                 login_user(user, remember=True)
                 return redirect(url_for('views.home'))
             else:
                 flash('Incorrect password, try again.', category='error')
         else:
-            flash('Email does not exist', category='error')
+            flash('Email does not exist.', category='error')
 
-    return render_template("login.html", user=current_user)
+    return render_template('login.html', user=current_user)
 
 @auth.route('/logout')
 @login_required
@@ -40,27 +40,29 @@ def sign_up():
         first_name = request.form.get('firstName')
         password1 = request.form.get('password1')
         password2 = request.form.get('password2')
-        
-        user = User.query.filter_by(email=email).first()
+
+        user = db.session.scalar(select(User).filter_by(email=email))
+
         if user:
-            flash('Email already exist', category='error')
-        
+            flash('Email already exists.', category='error')
         elif len(email) < 4:
-            flash('email must be greater than 3 characters', category='error')
+            flash('Email must be greater than 3 characters.', category='error')
         elif len(first_name) < 2:
-            flash('First name must be greater than 1 characters', category='error')
+            flash('First name must be greater than 1 character.', category='error')
         elif password1 != password2:
-            flash('password don\'t match', category='error')
+            flash("Passwords don't match.", category='error')
         elif len(password1) < 7:
-            flash('password must be at least than 7 characters', category='error')
+            flash('Password must be at least 7 characters.', category='error')
         else:
-            new_user = User(email=email, first_name=first_name, password=generate_password_hash(password1, method='sha256'))
+            new_user = User(
+                email=email,
+                first_name=first_name,
+                password=generate_password_hash(password1)  # modern default
+            )
             db.session.add(new_user)
             db.session.commit()
-            login_user(user, remember=True)
-            flash('Account created', category='success')
+            login_user(new_user, remember=True)
+            flash('Account created!', category='success')
             return redirect(url_for('views.home'))
-            
-    return render_template("Sign_up.html", user=current_user)
 
-
+    return render_template('sign_up.html', user=current_user)
